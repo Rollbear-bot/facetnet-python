@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
+import data
+
 from func.util import *
 from sklearn.metrics import mutual_info_score
 from func.synthetic import generate_evolution, generate_evolution2, \
@@ -213,15 +215,23 @@ def exp3():
 # 使用自收集的dblp数据集来实验
 def exp_dblp():
     # 数据集路径
-    # data_path = "./data/cit-DBLP/"
-    data_path = "./data/fb-pages-food/"
+    data_path = "./data/cit-DBLP/"
+    # data_path = "./data/fb-pages-food/"
+    # data_path = "./data/syntetic2/"
 
     alpha = 0.9
-    N, M = 942, 4  # 社区的数量需要指定
+    # N, M = 942, 4  # 社区的数量需要指定
     np.random.seed(0)  # 随机化
     # alg(data_path, alpha=alpha, tsteps=1, N=N, M=M, with_truth=False)  # 执行算法
-    for res in alg_extended(data_path, alpha, 1, 4, with_truth=False):
-        print(res)
+
+    comm_info = []
+    for cur_comm in alg_extended(data_path, alpha, 1, 4, with_truth=False):
+        # todo::链接节点与社区，并绘图
+        # print(cur_comm)
+        plt.plot(cur_comm[:10])  # 只选用一小部分节点绘图，以获得清晰的效果
+
+    plt.savefig("./fig/f.jpg")
+    plt.show()  # 绘图
 
 
 if __name__ == "__main__":
