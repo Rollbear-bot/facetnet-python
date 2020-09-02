@@ -230,7 +230,7 @@ def exp_dblp():
         # print(cur_comm)
         plt.plot(cur_comm[:10])  # 只选用一小部分节点绘图，以获得清晰的效果
 
-    plt.savefig("./fig/f.jpg")
+    plt.savefig("./fig/f2.jpg")
     plt.show()  # 绘图
 
 
