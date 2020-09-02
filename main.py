@@ -1,4 +1,4 @@
-#coding=utf-8
+# coding=utf-8
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -6,6 +6,7 @@ import os
 import matplotlib.pyplot as plt
 from util import *
 from sklearn.metrics import mutual_info_score
+
 
 def param_update(X, A, Y, W, alpha):
     W_apprx = X * A * X.T
@@ -24,29 +25,31 @@ def param_update(X, A, Y, W, alpha):
     Y = X_new * A_new
     return X_new, A_new, Y
 
-def read_edgelist(filename,weighted = False):
+
+def read_edgelist(filename, weighted=False):
     idmap = set()
     edge_cache = {}
     with open(filename) as f:
         for line in f:
             if weighted:
-                u,v,w = [int(x) for x in line.strip().split()]
+                u, v, w = [int(x) for x in line.strip().split()]
             else:
                 tmp = [int(x) for x in line.strip().split()]
-                u,v,w  = tmp[0],tmp[1],1.0
-            edge_cache[(u,v)] = w
+                u, v, w = tmp[0], tmp[1], 1.0
+            edge_cache[(u, v)] = w
             idmap.add(u)
             idmap.add(v)
-    idmap = list(idmap)                                   # 数组下标与结点唯一id标识的映射
-    idmap_inv = {nid: i for i,nid in enumerate(idmap)}   # 结点唯一id标识与数组下标的映射
+    idmap = list(idmap)  # 数组下标与结点唯一id标识的映射
+    idmap_inv = {nid: i for i, nid in enumerate(idmap)}  # 结点唯一id标识与数组下标的映射
     N = len(idmap)
-    adj_mat = np.zeros((N,N))
-    for (u,v),w in edge_cache.items():
-        adj_mat[idmap_inv[u],idmap_inv[v]] = w
+    adj_mat = np.zeros((N, N))
+    for (u, v), w in edge_cache.items():
+        adj_mat[idmap_inv[u], idmap_inv[v]] = w
     adj_mat += adj_mat.T
     return idmap, idmap_inv, adj_mat
 
-def alg(net_path, alpha,tsteps,N,M,with_truth=True):        # FacetNet with # of nodes and communities fixed
+
+def alg(net_path, alpha, tsteps, N, M, with_truth=True):  # FacetNet with # of nodes and communities fixed
     X, A = np.random.rand(N, M), np.diag(np.random.rand(M))
     X, A = np.matrix(X / np.sum(X, axis=0).reshape(1, M)), np.matrix(A / np.sum(A))
     Y = X * A
@@ -55,8 +58,8 @@ def alg(net_path, alpha,tsteps,N,M,with_truth=True):        # FacetNet with # of
         # idmap, mapping: nodeid → array_id
         idmap, idmap_inv, adj_mat = read_edgelist(net_path + "%d.edgelist" % t, weighted=False)
         if with_truth:
-            with open(net_path+"%d.comm" % t) as f:
-                comm_map = {}                       # mapping: nodeid → its community
+            with open(net_path + "%d.comm" % t) as f:
+                comm_map = {}  # mapping: nodeid → its community
                 for line in f:
                     id0, comm0 = line.strip().split()
                     comm_map[int(id0)] = int(comm0)
@@ -81,6 +84,7 @@ def alg(net_path, alpha,tsteps,N,M,with_truth=True):        # FacetNet with # of
         # print(evolution_net)
         X, A = X_new, A_new
 
+
 # do experiment with network stated in 4.1.2
 def exp1():
     tsteps = 15
@@ -91,16 +95,17 @@ def exp1():
     alpha = 0.9
     N, M = 128, 4
     np.random.seed(0)
-    alg("./data/syntetic1/",alpha,tsteps,N,M)
+    alg("./data/syntetic1/", alpha, tsteps, N, M)
+
 
 # FacetNet with # of nodes and communities changed
-def alg_extended(net_path, alpha,tsteps,M,with_truth=True):
-    idmap0,idmap_inv0 = [],{}
+def alg_extended(net_path, alpha, tsteps, M, with_truth=True):
+    idmap0, idmap_inv0 = [], {}
     for t in range(tsteps):
         print("time:", t)
-        idmap, idmap_inv, adj_mat = read_edgelist(net_path+"%d.edgelist" % t, weighted=False)
+        idmap, idmap_inv, adj_mat = read_edgelist(net_path + "%d.edgelist" % t, weighted=False)
         if with_truth:
-            with open(net_path+"%d.comm" % t) as f:
+            with open(net_path + "%d.comm" % t) as f:
                 comm_map = {}
                 for line in f:
                     id0, comm0 = line.strip().split()
@@ -111,17 +116,17 @@ def alg_extended(net_path, alpha,tsteps,M,with_truth=True):
             X, A = np.random.rand(N, M), np.diag(np.random.rand(M))
             X, A = np.matrix(X / np.sum(X, axis=0).reshape(1, M)), np.matrix(A / np.sum(A))
             Y = X * A
-        else:                    # adjustment for changing of nodes
+        else:  # adjustment for changing of nodes
             reserved_rows = [idmap_inv0[x] for x in idmap0 if x in idmap]
-            num_new,num_old = len(set(idmap) - set(idmap0)),len(reserved_rows)
-            Y = Y[reserved_rows,:]
+            num_new, num_old = len(set(idmap) - set(idmap0)), len(reserved_rows)
+            Y = Y[reserved_rows, :]
             Y /= np.sum(Y)
-            Y = np.pad(Y,((0,num_new),(0,0)),mode='constant',constant_values=(0,0))
+            Y = np.pad(Y, ((0, num_new), (0, 0)), mode='constant', constant_values=(0, 0))
             # not mentioned on the paper, but are necessary for node changing
-            X = X[reserved_rows,:]
+            X = X[reserved_rows, :]
             X = np.matrix(X / np.sum(X, axis=0).reshape(1, M))
-            X *= num_old/(num_old+num_new)
-            X = np.pad(X, ((0, num_new), (0, 0)), mode='constant', constant_values=(1/num_new, 1/num_new))
+            X *= num_old / (num_old + num_new)
+            X = np.pad(X, ((0, num_new), (0, 0)), mode='constant', constant_values=(1 / num_new, 1 / num_new))
 
         X_new, A_new, Y = param_update(X, A, Y, W, alpha)
         D = np.zeros((N,))
@@ -136,14 +141,15 @@ def alg_extended(net_path, alpha,tsteps,M,with_truth=True):
             print("mutual_info:", mutual_info_score(comm, comm_pred))
         s_modu = soft_modularity(soft_comm, W)
         print("soft_modularity: %f" % s_modu)
-        #community_net = A_new * X_new.T * soft_comm
-        #print("community_net")
-        #print(community_net)
+        # community_net = A_new * X_new.T * soft_comm
+        # print("community_net")
+        # print(community_net)
         # evolution_net = X.T * soft_comm
         # print("evolution_net")
         # print(evolution_net)
         X, A = X_new, A_new
         idmap0, idmap_inv0 = idmap, idmap_inv
+
 
 # do experiment with adding and removing nodes
 def exp2():
@@ -154,7 +160,8 @@ def exp2():
     print("start the algorithm")
     alpha = 0.5
     np.random.seed(0)
-    alg_extended("./data/syntetic2/",alpha,tsteps,4)
+    alg_extended("./data/syntetic2/", alpha, tsteps, 4)
+
 
 # do experiment with network stated in 4.1.2, adding weight
 def exp3():
@@ -166,7 +173,8 @@ def exp3():
     alpha = 0.9
     N, M = 128, 4
     np.random.seed(0)
-    alg("./data/syntetic3/",alpha,tsteps,N,M)
+    alg("./data/syntetic3/", alpha, tsteps, N, M)
+
 
 if __name__ == "__main__":
     print("do experiment with network stated in 4.1.2")
