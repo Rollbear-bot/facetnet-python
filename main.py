@@ -19,7 +19,7 @@ def param_update(X, A, Y, W, alpha):
 
     print("param update...")
     for k in range(M):
-        print(f"{k+1}/{M}")  # 打印进度
+        print(f"({k+1}/{M})")  # 打印进度
         for i in tqdm(range(N)):  # 添加了进度条显示
             for j in range(N):
                 X_new[i, k] += W[i, j] * A[k, k] * X[j, k] / W_apprx[i, j]
@@ -213,8 +213,8 @@ def exp3():
 # 使用自收集的dblp数据集来实验
 def exp_dblp():
     # 数据集路径
-    # data_path = "C://Users/13592/PycharmProjects/SocialNetwork/dataset/cit-DBLP/"
-    data_path = "C://Users/13592/PycharmProjects/SocialNetwork/dataset/fb-pages-food/"
+    # data_path = "./data/cit-DBLP/"
+    data_path = "./data/fb-pages-food/"
 
     alpha = 0.9
     N, M = 942, 4  # 社区的数量需要指定

@@ -1,1 +1,5 @@
 networkx
+numpy
+pandas
+matplotlib
+tqdm
