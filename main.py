@@ -4,16 +4,23 @@ import numpy as np
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
-from util import *
+from func.util import *
 from sklearn.metrics import mutual_info_score
+from func.synthetic import generate_evolution, generate_evolution2, \
+    generate_evolution3
+
+from tqdm import tqdm  # 进度条功能
 
 
 def param_update(X, A, Y, W, alpha):
     W_apprx = X * A * X.T
     N, M = Y.shape
     X_new, A_new = np.zeros(X.shape), np.zeros(A.shape)
+
+    print("param update...")
     for k in range(M):
-        for i in range(N):
+        print(f"{k+1}/{M}")  # 打印进度
+        for i in tqdm(range(N)):  # 添加了进度条显示
             for j in range(N):
                 X_new[i, k] += W[i, j] * A[k, k] * X[j, k] / W_apprx[i, j]
                 A_new[k, k] += W[i, j] * X[i, k] * X[j, k] / W_apprx[i, j]
@@ -49,56 +56,59 @@ def read_edgelist(filename, weighted=False):
     return idmap, idmap_inv, adj_mat
 
 
-def alg(net_path, alpha, tsteps, N, M, with_truth=True):  # FacetNet with # of nodes and communities fixed
-    X, A = np.random.rand(N, M), np.diag(np.random.rand(M))
+# FacetNet with # of nodes and communities fixed
+# FacetNet算法的基础形式：节点和社区固定（应该是指数量固定）
+def alg(net_path, alpha, tsteps, N, M, with_truth=True):
+    """
+    FacetNet算法的基础形式
+    :param net_path: 数据集路径（边集）
+    :param alpha:
+    :param tsteps: 时间片个数（与数据集的时间片个数保持一致）
+    :param N: 节点的个数(fixed)?，默认的生成器配置为128
+    :param M: 社区的个数(fixed)?，默认的生成器配置为4
+    :param with_truth: 数据是否包含ground truth
+    :return: none，结果直接输出到控制台
+    """
+    X, A = np.random.rand(N, M), np.diag(np.random.rand(M))  # X为 N * M 的随机数矩阵，A为 M * M 的对角随机数矩阵
     X, A = np.matrix(X / np.sum(X, axis=0).reshape(1, M)), np.matrix(A / np.sum(A))
     Y = X * A
+
     for t in range(tsteps):
         # G = nx.read_weighted_edgelist(net_path+"%d.edgelist" % t)
         # idmap, mapping: nodeid → array_id
-        idmap, idmap_inv, adj_mat = read_edgelist(net_path + "%d.edgelist" % t, weighted=False)
+        idmap, idmap_inv, adj_mat = read_edgelist(net_path + "%d.edgelist" % t, weighted=False)  # 从文件读取图数据（edgelist），这里是无权图
         if with_truth:
-            with open(net_path + "%d.comm" % t) as f:
-                comm_map = {}  # mapping: nodeid → its community
+            with open(net_path + "%d.comm" % t) as f:  # 如果存在ground truth社区，则读取它们
+                comm_map = {}  # mapping: nodeid → its community; comm_map保存从节点id到它所属的社区号的映射
                 for line in f:
                     id0, comm0 = line.strip().split()
                     comm_map[int(id0)] = int(comm0)
-        W = Sim(adj_mat, weighted=False)
-        X_new, A_new, Y = param_update(X, A, Y, W, alpha)
-        D = np.zeros((N,))
+        W = Sim(adj_mat, weighted=False)  # adj_mat是邻接矩阵
+        X_new, A_new, Y = param_update(X, A, Y, W, alpha)  # todo::param_update的功能？
+        D = np.zeros((N,))  # D为长度为N的零向量
         for i in range(N):
             D[i] = np.sum(Y[i, :])
         D = np.matrix(np.diag(D))
         soft_comm = D.I * X_new * A_new
-        comm_pred = np.array(np.argmax(soft_comm, axis=1)).ravel()
+        comm_pred = np.array(np.argmax(soft_comm, axis=1)).ravel()  # 社区预测
         print("time:", t)
         if with_truth:
             comm = np.array([comm_map[idmap_inv[i]] for i in range(N)])
-            print("mutual_info:", mutual_info_score(comm, comm_pred))
-        print("soft_modularity:", soft_modularity(soft_comm, W))
+            print("mutual_info:", mutual_info_score(comm, comm_pred))  # 计算并打印mutual info score（仅当数据集包含ground truth）
+        print("soft_modularity:", soft_modularity(soft_comm, W))  # 计算并打印模块度
         # community_net = A_new * X_new.T * soft_comm
         # print("community_net")
         # print(community_net)
         # evolution_net = X.T * soft_comm
         # print("evolution_net")
         # print(evolution_net)
-        X, A = X_new, A_new
+        X, A = X_new, A_new  # 迭代更新X和A矩阵
 
-
-# do experiment with network stated in 4.1.2
-def exp1():
-    tsteps = 15
-    from synthetic import generate_evolution
-    print("generating synthetic graph")
-    generate_evolution("./data/syntetic1/", tsteps=tsteps)
-    print("start the algorithm")
-    alpha = 0.9
-    N, M = 128, 4
-    np.random.seed(0)
-    alg("./data/syntetic1/", alpha, tsteps, N, M)
+        yield comm_pred  # 改造为生成器
 
 
 # FacetNet with # of nodes and communities changed
+# FacetNet算法的扩展形式：节点和社区可变（应该是指数量）
 def alg_extended(net_path, alpha, tsteps, M, with_truth=True):
     idmap0, idmap_inv0 = [], {}
     for t in range(tsteps):
@@ -150,13 +160,34 @@ def alg_extended(net_path, alpha, tsteps, M, with_truth=True):
         X, A = X_new, A_new
         idmap0, idmap_inv0 = idmap, idmap_inv
 
+        yield comm_pred  # 改造为生成器
+
+
+# do experiment with network stated in 4.1.2
+# 论文中4.1.2小节的实验
+def exp1():
+    # 生成人工图到data目录，人工网络包含ground truth的社区
+    tsteps = 15  # 应该是指定人工网络中时间片的个数
+    print("generating synthetic graph")
+    generate_evolution("./data/syntetic1/", tsteps=tsteps)
+
+    # 执行算法
+    print("start the algorithm")
+    alpha = 0.9  # todo::alpha参数含义？
+    N, M = 128, 4  # todo::N和M参数含义？
+    np.random.seed(0)  # 重新随机化
+    alg("./data/syntetic1/", alpha, tsteps, N, M)
+
 
 # do experiment with adding and removing nodes
+# 增减节点的实验
 def exp2():
+    # 生成人工图
     tsteps = 15
-    from synthetic import generate_evolution2
     print("generating synthetic graph")
     generate_evolution2("./data/syntetic2/", tsteps=tsteps)
+
+    # 执行探测算法
     print("start the algorithm")
     alpha = 0.5
     np.random.seed(0)
@@ -164,11 +195,14 @@ def exp2():
 
 
 # do experiment with network stated in 4.1.2, adding weight
+# 论文中4.1.2小节的实验，带权图
 def exp3():
+    # 生成人工图到data目录
     tsteps = 15
-    from synthetic import generate_evolution3
     print("generating synthetic graph")
     generate_evolution3("./data/syntetic3/", tsteps=tsteps)
+
+    # 执行算法
     print("start the algorithm")
     alpha = 0.9
     N, M = 128, 4
@@ -176,10 +210,25 @@ def exp3():
     alg("./data/syntetic3/", alpha, tsteps, N, M)
 
 
+# 使用自收集的dblp数据集来实验
+def exp_dblp():
+    # 数据集路径
+    # data_path = "C://Users/13592/PycharmProjects/SocialNetwork/dataset/cit-DBLP/"
+    data_path = "C://Users/13592/PycharmProjects/SocialNetwork/dataset/fb-pages-food/"
+
+    alpha = 0.9
+    N, M = 942, 4  # 社区的数量需要指定
+    np.random.seed(0)  # 随机化
+    # alg(data_path, alpha=alpha, tsteps=1, N=N, M=M, with_truth=False)  # 执行算法
+    for res in alg_extended(data_path, alpha, 1, 4, with_truth=False):
+        print(res)
+
+
 if __name__ == "__main__":
-    print("do experiment with network stated in 4.1.2")
-    exp1()
-    print("\ndo experiment with adding and removing nodes")
-    exp2()
-    print("\ndo experiment with network stated in 4.1.2, adding weight")
-    exp3()
+    # print("do experiment with network stated in 4.1.2")
+    # exp1()
+    # print("\ndo experiment with adding and removing nodes")
+    # exp2()
+    # print("\ndo experiment with network stated in 4.1.2, adding weight")
+    # exp3()
+    exp_dblp()
